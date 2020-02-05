@@ -7,8 +7,14 @@ import {
   Chip,
   Container,
   Card,
-  CardContent
+  CardContent,
+  InputAdornment,
+  IconButton
 } from '@material-ui/core';
+import { Check, ErrorOutline } from '@material-ui/icons';
+import { green } from '@material-ui/core/colors';
+
+import cityList from './city.list.json';
 
 export default class App extends React.Component {
   constructor() {
@@ -16,14 +22,55 @@ export default class App extends React.Component {
 
     this.state = {
       apiKey: 'fc932c67434613e809c47f3c64d28601',
-      city: 'Lviv',
+      city: '',
       forecast: [],
       curForecast: {},
       dailyForecast: [],
       hourlyForecast: [],
+      lat: '',
+      lon: '',
       loading: true,
       error: null
     };
+  }
+
+  getInitialForecast(e) {
+    this.setState({ loading: true });
+    e && e.preventDefault();
+
+    axios
+      .get(
+        `https://api.openweathermap.org/data/2.5/forecast?lat=${this.state.lat}&lon=${this.state.lon}&units=metric&appid=${this.state.apiKey}`
+      )
+      .then(res => {
+        let dailyForecast = [];
+
+        res.data.list.forEach((elem, index) => {
+          if (
+            index < res.data.list.length - 1 &&
+            new Date(elem.dt * 1000).getDate() !==
+              new Date(res.data.list[index + 1].dt * 1000).getDate()
+          ) {
+            dailyForecast.push(elem);
+          }
+        });
+
+        this.setState({
+          forecast: res.data.list,
+          dailyForecast: dailyForecast,
+          error: null
+        });
+
+        // Get data for today's forecast
+        this.showCurWeather(new Date().getDate());
+        this.showHourlyForecast(new Date().getDate());
+      })
+      .catch(err =>
+        this.setState({
+          error: err.response.data,
+          loading: false
+        })
+      );
   }
 
   getForecast(e) {
@@ -57,7 +104,12 @@ export default class App extends React.Component {
         this.showCurWeather(new Date().getDate());
         this.showHourlyForecast(new Date().getDate());
       })
-      .catch(err => this.setState({ error: err.data, loading: false }));
+      .catch(err =>
+        this.setState({
+          error: err.response.data,
+          loading: false
+        })
+      );
   }
 
   showCurWeather(date) {
@@ -93,7 +145,29 @@ export default class App extends React.Component {
   }
 
   componentDidMount() {
-    this.getForecast();
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(({ coords }) => {
+        const curCity = cityList
+          .filter(
+            city =>
+              Math.round(city.coord.lat) === Math.round(coords.latitude) &&
+              Math.round(city.coord.lon) === Math.round(coords.longitude)
+          )
+          .sort((a, b) => {
+            const lat_a = Math.abs(a.coord.lat - coords.latitude);
+            const lon_a = Math.abs(a.coord.lon - coords.longitude);
+            const lat_b = Math.abs(b.coord.lat - coords.latitude);
+            const lon_b = Math.abs(b.coord.lon - coords.longitude);
+            return lat_a + lon_a - (lat_b + lon_b);
+          });
+        this.setState({
+          city: curCity[0].name
+        });
+        this.getForecast();
+      });
+    } else {
+      this.getForecast();
+    }
   }
 
   render() {
@@ -104,11 +178,30 @@ export default class App extends React.Component {
         <form onSubmit={e => this.getForecast(e)}>
           <TextField
             error={this.state.error !== null}
-            helperText={this.state.error !== null && 'City not found'}
+            helperText={
+              this.state.error !== null &&
+              this.state.error.message.slice(0, 1).toUpperCase() +
+                this.state.error.message.slice(1)
+            }
             variant="outlined"
             placeholder="Search for your city"
             onChange={e => this.setState({ city: e.target.value })}
             value={this.state.city}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={e => this.showForecast(e)}>
+                    {!this.state.error && !this.state.loading && (
+                      <Check style={{ color: green[500] }} />
+                    )}
+                    {this.state.error && !this.state.loading && (
+                      <ErrorOutline color="error" />
+                    )}
+                    {this.state.loading && <CircularProgress size="1em" />}
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
           />
         </form>
         {!this.state.loading && this.state.error === null && (
@@ -121,7 +214,8 @@ export default class App extends React.Component {
                   <p>Humidity: {this.state.curForecast.main.humidity}%</p>
                   <p>
                     Wind speed:{' '}
-                    {Math.round(this.state.curForecast.wind.speed) * 3.6}km/h
+                    {Math.round(this.state.curForecast.wind.speed) * 3.6}
+                    km/h
                   </p>
                 </div>
               </Grid>
@@ -164,12 +258,6 @@ export default class App extends React.Component {
                         : 'rgba(0, 0, 0, 0.12)',
                     cursor: 'pointer'
                   }}
-                  // color={
-                  //   new Date(this.state.curForecast.dt * 1000).getDate() ===
-                  //   new Date(elem.dt * 1000).getDate()
-                  //     ? 'primary'
-                  //     : 'default'
-                  // }
                   onClick={() =>
                     this.showCurWeather(new Date(elem.dt * 1000).getDate())
                   }
