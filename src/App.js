@@ -1,159 +1,194 @@
 import React from 'react';
 import axios from 'axios';
 import {
-  Grid,
   TextField,
-  InputAdornment,
-  IconButton,
-  CircularProgress
+  CircularProgress,
+  Grid,
+  Chip,
+  Container,
+  Card,
+  CardContent
 } from '@material-ui/core';
-import {
-  BubbleChartOutlined,
-  ArrowDownward,
-  CloudOutlined,
-  Speed,
-  Check,
-  ErrorOutline
-} from '@material-ui/icons/';
-
-// User Components
-import DetailCard from './components/DetailCard';
-import { green } from '@material-ui/core/colors';
 
 export default class App extends React.Component {
   constructor() {
     super();
 
     this.state = {
+      apiKey: 'fc932c67434613e809c47f3c64d28601',
       city: 'Lviv',
-      API_KEY: 'fc932c67434613e809c47f3c64d28601',
       forecast: [],
+      curForecast: {},
+      dailyForecast: [],
+      hourlyForecast: [],
       loading: true,
-      errors: []
+      error: null
     };
+  }
 
-    this.showForecast = this.showForecast.bind(this);
+  getForecast(e) {
+    this.setState({ loading: true });
+    e && e.preventDefault();
+
+    axios
+      .get(
+        `https://api.openweathermap.org/data/2.5/forecast?q=${this.state.city}&units=metric&appid=${this.state.apiKey}`
+      )
+      .then(res => {
+        let dailyForecast = [];
+
+        res.data.list.forEach((elem, index) => {
+          if (
+            index < res.data.list.length - 1 &&
+            new Date(elem.dt * 1000).getDate() !==
+              new Date(res.data.list[index + 1].dt * 1000).getDate()
+          ) {
+            dailyForecast.push(elem);
+          }
+        });
+
+        this.setState({
+          forecast: res.data.list,
+          dailyForecast: dailyForecast,
+          error: null
+        });
+
+        // Get data for today's forecast
+        this.showCurWeather(new Date().getDate());
+        this.showHourlyForecast(new Date().getDate());
+      })
+      .catch(err => this.setState({ error: err.data, loading: false }));
+  }
+
+  showCurWeather(date) {
+    let curForecast;
+
+    // Get forecast for selected date
+    for (let i = 0; i < this.state.forecast.length; i++) {
+      if (new Date(this.state.forecast[i].dt * 1000).getDate() === date) {
+        curForecast = this.state.forecast[i];
+
+        break;
+      }
+    }
+
+    this.setState({ curForecast: curForecast, error: null });
+    this.showHourlyForecast(date);
+  }
+
+  showHourlyForecast(date) {
+    let hourlyForecast = [];
+
+    this.state.forecast.forEach(elem => {
+      if (new Date(elem.dt * 1000).getDate() === date) {
+        hourlyForecast.push(elem);
+      }
+    });
+
+    this.setState({
+      hourlyForecast: hourlyForecast,
+      loading: false,
+      error: null
+    });
   }
 
   componentDidMount() {
-    this.showForecast(null);
-  }
-
-  showForecast(e) {
-    e && e.preventDefault();
-    this.setState({ loading: true });
-    axios
-      .get(
-        `http://api.openweathermap.org/data/2.5/forecast?q=${this.state.city}&units=metric&&APPID=${this.state.API_KEY}`
-      )
-      .then(res =>
-        this.setState({ forecast: res.data.list, loading: false, errors: [] })
-      )
-      .catch(error => {
-        this.setState({ errors: [error.response.data], loading: false });
-      });
+    this.getForecast();
   }
 
   render() {
-    const { forecast, errors, loading } = this.state;
+    const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     return (
-      <div>
-        <Grid
-          container
-          spacing={3}
-          className="forecast"
-          justify="space-between"
-        >
-          <Grid item md={3} className="forecast__info forecast__info_main">
-            {errors.length === 0 && loading === false && (
-              <div>
-                <img
-                  src={`https://openweathermap.org/img/wn/${forecast[0].weather[0].icon}@2x.png`}
-                  alt={forecast[0].weather[0].main}
-                />
-                <p className="forecast__weather">
-                  {forecast[0].weather[0].main}
-                </p>
-                <p className="forecast__temp">
-                  {Math.round(forecast[0].main.temp)} ℃
-                </p>
-                <p className="forecast__temp-detail">
-                  <sub className="forecast__temp-min">
-                    Min: {Math.round(forecast[0].main.temp_min)}
-                  </sub>
-                  <sub className="forecast__temp-max">
-                    Max: {Math.round(forecast[0].main.temp_max)}
-                  </sub>
-                </p>
-              </div>
-            )}
-          </Grid>
-
-          {/* Search */}
-
-          <Grid item md={3} className="forecast__search">
-            <form onSubmit={e => this.showForecast(e)}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                placeholder="Changle Location"
-                onChange={e => this.setState({ city: e.target.value })}
-                value={this.state.city}
-                error={errors.length > 0 && !loading ? true : false}
-                helperText={
-                  errors.length > 0 &&
-                  !loading &&
-                  errors[0].message[0].toUpperCase() +
-                    errors[0].message.slice(1)
-                }
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton onClick={e => this.showForecast(e)}>
-                        {errors.length === 0 && !loading && (
-                          <Check style={{ color: green[500] }} />
-                        )}
-                        {errors.length > 0 && !loading && (
-                          <ErrorOutline color="error" />
-                        )}
-                        {loading && <CircularProgress size="1em" />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
-              />
-            </form>
-          </Grid>
-
-          <Grid item md={3} className="forecast__info forecast__info_detail">
-            {errors.length === 0 && loading === false && (
-              <div>
-                <DetailCard
-                  icon={<BubbleChartOutlined fontSize="large" />}
-                  title="Humidity"
-                  value={forecast[0].main.humidity + ' %'}
-                />
-                <DetailCard
-                  icon={<ArrowDownward fontSize="large" />}
-                  title="Air Pressure"
-                  value={forecast[0].main.pressure + ' PS'}
-                />
-                <DetailCard
-                  icon={<CloudOutlined fontSize="large" />}
-                  title="Cloudiness"
-                  value={forecast[0].clouds.all + ' %'}
-                />
-                <DetailCard
-                  icon={<Speed fontSize="large" />}
-                  title="Wind Speed"
-                  value={forecast[0].wind.speed + ' km/h'}
-                />
-              </div>
-            )}
-          </Grid>
-        </Grid>
-      </div>
+      <Container>
+        <form onSubmit={e => this.getForecast(e)}>
+          <TextField
+            error={this.state.error !== null}
+            helperText={this.state.error !== null && 'City not found'}
+            variant="outlined"
+            placeholder="Search for your city"
+            onChange={e => this.setState({ city: e.target.value })}
+            value={this.state.city}
+          />
+        </form>
+        {!this.state.loading && this.state.error === null && (
+          <div>
+            <Grid container>
+              <Grid item>
+                <h1>{Math.round(this.state.curForecast.main.temp)} ℃</h1>
+                <div>
+                  <p>Cloudiness: {this.state.curForecast.clouds.all}%</p>
+                  <p>Humidity: {this.state.curForecast.main.humidity}%</p>
+                  <p>
+                    Wind speed:{' '}
+                    {Math.round(this.state.curForecast.wind.speed) * 3.6}km/h
+                  </p>
+                </div>
+              </Grid>
+            </Grid>
+            <Grid container justify="flex-start">
+              {this.state.hourlyForecast.map((elem, index) => (
+                <Grid item key={index}>
+                  <p className="temp-secondary">{Math.round(elem.main.temp)}</p>
+                  <Chip
+                    color={
+                      new Date(elem.dt * 1000).getHours() ===
+                      new Date(this.state.curForecast.dt * 1000).getHours()
+                        ? 'primary'
+                        : 'default'
+                    }
+                    onClick={() => this.setState({ curForecast: elem })}
+                    label={`${
+                      new Date(elem.dt * 1000).getHours() < 10
+                        ? '0' + new Date(elem.dt * 1000).getHours()
+                        : new Date(elem.dt * 1000).getHours()
+                    }:${
+                      new Date(elem.dt * 1000).getMinutes() < 10
+                        ? '0' + new Date(elem.dt * 1000).getMinutes()
+                        : new Date(elem.dt * 1000).getMinutes()
+                    }`}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+            <Grid container>
+              {this.state.dailyForecast.map((elem, index) => (
+                <Card
+                  key={index}
+                  variant="outlined"
+                  style={{
+                    borderColor:
+                      new Date(elem.dt * 1000).getDate() ===
+                      new Date(this.state.curForecast.dt * 1000).getDate()
+                        ? '#1976d2'
+                        : 'rgba(0, 0, 0, 0.12)',
+                    cursor: 'pointer'
+                  }}
+                  // color={
+                  //   new Date(this.state.curForecast.dt * 1000).getDate() ===
+                  //   new Date(elem.dt * 1000).getDate()
+                  //     ? 'primary'
+                  //     : 'default'
+                  // }
+                  onClick={() =>
+                    this.showCurWeather(new Date(elem.dt * 1000).getDate())
+                  }
+                >
+                  <CardContent>
+                    <p>{day[new Date(elem.dt * 1000).getDay()]}</p>
+                    <p>
+                      <span>{Math.round(elem.main.temp_max)}° </span>
+                      <span style={{ color: '#777' }}>
+                        {Math.round(elem.main.temp_min)}°
+                      </span>
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </Grid>
+          </div>
+        )}
+      </Container>
     );
   }
 }
