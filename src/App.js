@@ -174,7 +174,13 @@ export default class App extends React.Component {
     const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     return (
-      <Container>
+      <Container
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center'
+        }}
+      >
         <form onSubmit={e => this.getForecast(e)}>
           <TextField
             error={this.state.error !== null}
@@ -204,11 +210,13 @@ export default class App extends React.Component {
             }}
           />
         </form>
+        <br />
+
         {!this.state.loading && this.state.error === null && (
           <div>
             <Grid container>
               <Grid item>
-                <h1>{Math.round(this.state.curForecast.main.temp)} ℃</h1>
+                <h1>{Math.round(this.state.curForecast.main.temp)} °C</h1>
                 <div>
                   <p>Cloudiness: {this.state.curForecast.clouds.all}%</p>
                   <p>Humidity: {this.state.curForecast.main.humidity}%</p>
@@ -220,6 +228,7 @@ export default class App extends React.Component {
                 </div>
               </Grid>
             </Grid>
+            <br />
             <Grid container justify="flex-start">
               {this.state.hourlyForecast.map((elem, index) => (
                 <Grid item key={index}>
@@ -245,7 +254,8 @@ export default class App extends React.Component {
                 </Grid>
               ))}
             </Grid>
-            <Grid container>
+            <br />
+            <Grid container wrap="nowrap">
               {this.state.dailyForecast.map((elem, index) => (
                 <Card
                   key={index}
@@ -256,7 +266,9 @@ export default class App extends React.Component {
                       new Date(this.state.curForecast.dt * 1000).getDate()
                         ? '#1976d2'
                         : 'rgba(0, 0, 0, 0.12)',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexBasis: 'content'
                   }}
                   onClick={() =>
                     this.showCurWeather(new Date(elem.dt * 1000).getDate())
@@ -264,7 +276,13 @@ export default class App extends React.Component {
                 >
                   <CardContent>
                     <p>{day[new Date(elem.dt * 1000).getDay()]}</p>
-                    <p>
+                    <p
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'start',
+                        flexWrap: 'nowrap'
+                      }}
+                    >
                       <span>{Math.round(elem.main.temp_max)}° </span>
                       <span style={{ color: '#777' }}>
                         {Math.round(elem.main.temp_min)}°
